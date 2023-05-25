@@ -1,1 +1,0 @@
-odin build .\sim8086.odin -file -show-timings
