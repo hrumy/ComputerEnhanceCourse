@@ -1,1 +1,1 @@
-odin build .\sim8086.odin -file -show-timings
+odin build .\sim8086.odin -file -show-timings -debug -pdb-name:sim8086.pdb -build-mode:exe 

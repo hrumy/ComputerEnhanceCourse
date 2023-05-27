@@ -2,6 +2,7 @@ package main
 
 import "core:fmt"
 import "core:os"
+import "core:time"
 
 Register_W0 :: [8]string {
     "al",
@@ -25,7 +26,7 @@ Register_W1 :: [8]string {
     "di",
 }
 
-Effective_Adress :: [8]string {
+effective_adress := [8]string {
     "bx + si",
     "bx + di",
     "bp + si",
@@ -51,17 +52,14 @@ main :: proc() {
     }
 
     fmt.printf("bits 16\n\n");
-
     for i := 0; i < len(data); i += 2 {
         first_byte  : u8 = data[i];
         second_byte : u8 = data[i + 1];
 
-        // fmt.printf("\nfirst byte: %d, second byte: %d\n", first_byte, second_byte);
-
         src_bits, dst_bits : u8;
 
         switch first_byte {
-            case 0b10001000..<0b10001011 : {
+            case 0b10001000..=0b10001011 : {
             // register/memory to/from register 
 
                 d := bool((first_byte & 2) >> 1);
@@ -72,31 +70,41 @@ main :: proc() {
                 rm  :=  second_byte & 7;
 
                 reg_string := w ? Register_W1 : Register_W0;
-                ea := Effective_Adress;
-                
-                fmt.printf("mod: %d ", mod);
+
                 switch mod {
                     case 0b00 : {
                     // memory mode, no displacement
                         if rm == 0b110 {
-                            fmt.print("Direct adress.\n");
-
+                        // 16-bit displacement
+                            offset  := u16(data[i + 3]);
+                            offset   = offset << 8;
+                            offset  |= u16(data[i + 2]);
+                            if d { fmt.printf("mov %s, [%d]\n", reg_string[reg], offset); }
+                            else { fmt.printf("mov [%d], %s\n", offset, reg_string[reg]); }
                             i += 2;
                         }
                         else {
-                            fmt.printf("mov %s, [%s]\n", reg_string[rm], ea[rm]);
+                            if d { fmt.printf("mov %s, [%s]\n", reg_string[reg], effective_adress[rm]); }
+                            else { fmt.printf("mov [%s], %s\n", effective_adress[rm], reg_string[reg]); }
                         }
                     }
                         
                     case 0b01 : {
                     // memory mode, 8-bit displacement
-                        fmt.print("8-bit\n");
+                        if d { fmt.printf("mov %s, [%s + %d]\n", reg_string[reg], effective_adress[rm], data[i + 2]); }
+                        else { fmt.printf("mov [%s + %d], %s\n", effective_adress[rm], data[i + 2], reg_string[reg]); }
                         i += 1;
                     }
 
                     case 0b10 : {
                     // memory mode, 16-bit displacement
-                        fmt.print("16-bit .\n");
+                        offset  := u16(data[i + 3]);
+                        offset   = offset << 8;
+                        offset  |= u16(data[i + 2]);
+                        
+                        if d { fmt.printf("mov %s, [%s + %d]\n", reg_string[reg], effective_adress[rm], offset); }
+                        else { fmt.printf("mov [%s + %d], %s\n", effective_adress[rm], offset, reg_string[reg]); }
+                        
                         i += 2;
                     }
 
@@ -119,7 +127,7 @@ main :: proc() {
                 }
             }
 
-            case 0b10110000..<0b10111111 : {
+            case 0b10110000..=0b10111111 : {
             // immediate to register
 
                 w   := bool((first_byte & 8) >> 3);
@@ -133,11 +141,10 @@ main :: proc() {
                     data_in  = data_in << 8;
                     data_in |= u16(second_byte);
 
-                    i += 2;
+                    i += 1;
                 }
                 else {
                     data_in = u16(second_byte);
-                    i += 1;
                 }
                 
                 fmt.printf("mov %s, %d\n", reg_string[reg], data_in);
